@@ -3,7 +3,7 @@ using System.Linq;
 using System.Collections;
 using System.Text.RegularExpressions;
 
-public class palindromes : MonoBehaviour
+public class Palindromes : MonoBehaviour
 {
     public KMAudio Audio;
     public KMBombInfo Info;
@@ -12,13 +12,15 @@ public class palindromes : MonoBehaviour
     public KMSelectable[] Buttons;
     public TextMesh[] Text;
 
-    bool _isSolved = false;
+    bool isSolved = false;
     private bool _isAnimating = false;
     private byte _current = 0;
     static int _moduleIdCounter;
     int _moduleId;
-    string _x = "", _y = "", _z = "";
-
+#pragma warning disable 414
+    string x = "", y = "", z = "", n = "";
+#pragma warning restore 414
+    
     private void Awake()
     {
         _moduleId = _moduleIdCounter++;
@@ -77,11 +79,14 @@ public class palindromes : MonoBehaviour
 
     private void HandlePress(byte btn)
     {
-        Audio.PlayGameSoundAtTransform(KMSoundOverride.SoundEffect.ButtonPress, Buttons[btn].transform);
-        Buttons[btn].AddInteractionPunch();
+        if (btn < 3)
+        {
+            Audio.PlayGameSoundAtTransform(KMSoundOverride.SoundEffect.ButtonPress, Buttons[btn].transform);
+            Buttons[btn].AddInteractionPunch();
+        }
 
         //if solved, do nothing
-        if (_isSolved || _isAnimating)
+        if (isSolved || _isAnimating)
             return;
 
         //if left button was pressed, cycle from 0 through 9
@@ -97,167 +102,147 @@ public class palindromes : MonoBehaviour
             Audio.PlaySoundAtTransform("submit", Buttons[btn].transform);
 
             //if x hasn't been filled yet
-            if (_x.Length < 9)
+            if (x.Length < 9)
             {
-                _x += _current;
+                x += _current;
                 //if left half has been inputted, generate palindrome
-                if (_x.Length == 5)
+                if (x.Length == 5)
                     for (sbyte i = 3; i >= 0; i--)
-                        _x += _x[i];
+                        x += x[i];
             }
 
             //if y hasn't been filled yet
-            else if (_y.Length < 8)
+            else if (y.Length < 8)
             {
-                _y += _current;
+                y += _current;
                 //if left half has been inputted, generate palindrome
-                if (_y.Length == 4)
+                if (y.Length == 4)
                     for (sbyte i = 3; i >= 0; i--)
-                        _y += _y[i];
+                        y += y[i];
             }
 
             //if z hasn't been filled yet
-            else if (_z.Length < 7)
+            else if (z.Length < 7)
             {
-                _z += _current;
+                z += _current;
                 //if left half has been inputted, generate palindrome
-                if (_z.Length == 4)
+                if (z.Length == 4)
                     for (sbyte i = 2; i >= 0; i--)
-                        _z += _z[i];
+                        z += z[i];
             }
             _current = 0;
         }
 
         //if right button was pressed, delete the current variable
-        else
+        else if (btn == 2)
         {
             Audio.PlaySoundAtTransform("delete", Buttons[btn].transform);
-            if (_z.Length != 0)
-                _z = "";
-            else if (_y.Length != 0)
-                _y = "";
-            else if (_x.Length != 0)
-                _x = "";
+            if (z.Length != 0)
+                z = "";
+            else if (y.Length != 0)
+                y = "";
+            else if (x.Length != 0)
+                x = "";
             _current = 0;
+        }
+
+        //a fourth button normally doesn't exist on this module, but this is meant for twitchplays to auto-solve with
+        else
+        {
+            x = "000000000";
+            y = "00000000";
+            z = "0000000";
         }
 
         //update text on the button
         Text[2].text = _current.ToString();
 
         //if x is unfinished, display current digit on x
-        if (_x.Length < 9)
+        if (x.Length < 9)
         {
-            Text[1].text = "X  =  " + _x + _current;
-            Text[1].text += "\nY  =  " + _y;
-            Text[1].text += "\nZ  =  " + _z;
+            Text[1].text = "X  =  " + x + _current;
+            Text[1].text += "\nY  =  " + y;
+            Text[1].text += "\nZ  =  " + z;
         }
 
         //if y is unfinished, display current digit on y
-        else if (_y.Length < 8)
+        else if (y.Length < 8)
         {
-            Text[1].text = "X  =  " + _x;
-            Text[1].text += "\nY  =  " + _y + _current;
-            Text[1].text += "\nZ  =  " + _z;
+            Text[1].text = "X  =  " + x;
+            Text[1].text += "\nY  =  " + y + _current;
+            Text[1].text += "\nZ  =  " + z;
         }
 
         //if z is unfinished, display current digit on z
-        else if (_z.Length < 7)
+        else if (z.Length < 7)
         {
-            Text[1].text = "X  =  " + _x;
-            Text[1].text += "\nY  =  " + _y;
-            Text[1].text += "\nZ  =  " + _z + _current;
+            Text[1].text = "X  =  " + x;
+            Text[1].text += "\nY  =  " + y;
+            Text[1].text += "\nZ  =  " + z + _current;
         }
 
         //if everything has been filled, check if the answer is correct
         else
         {
-            Audio.PlaySoundAtTransform("calculate", Buttons[btn].transform);
-            Debug.LogFormat("[Palindromes #{0}]: Submitting numbers \"{1}\", \"{2}\", and \"{3}\".", _moduleId, _x, _y, _z);
-            Text[1].text = "X  =  " + _x;
-            Text[1].text += "\nY  =  " + _y;
-            Text[1].text += "\nZ  =  " + _z;
+            Audio.PlaySoundAtTransform("calculate", Buttons[1].transform);
+            Debug.LogFormat("[Palindromes #{0}]: Submitting numbers \"{1}\", \"{2}\", and \"{3}\".", _moduleId, x, y, z);
+            Text[1].text = "X  =  " + x;
+            Text[1].text += "\nY  =  " + y;
+            Text[1].text += "\nZ  =  " + z;
 
-            byte strike = 0;
-
-            //if x isn't a palindrome, the module should strike
-            for (byte i = 0; i < _x.Length && strike == 0; i++)
-                if (_x[i] != _x[_x.Length - i - 1])
-                {
-                    strike = 1;
-                    Debug.LogFormat("[Palindromes #{0}]: Variable X (\"{1}\") is not palindromic!", _moduleId, _x);
-                }
-
-            //if y isn't a palindrome, the module should strike
-            for (byte i = 0; i < _y.Length && strike == 0; i++)
-                if (_y[i] != _y[_y.Length - i - 1])
-                { 
-                    strike = 2;
-                    Debug.LogFormat("[Palindromes #{0}]: Variable Y (\"{1}\") is not palindromic!", _moduleId, _y);
-                }
-
-            //if z isn't a palindrome, the module should strike
-            for (byte i = 0; i < _z.Length && strike == 0; i++)
-                if (_z[i] != _z[_z.Length - i - 1])
-                {
-                    strike = 3;
-                    Debug.LogFormat("[Palindromes #{0}]: Variable Z (\"{1}\") is not palindromic!", _moduleId, _z);
-                }
-
-            //if x + y + z is are not equal to the screen display, the module should strike
-            if ((int.Parse(_x) + int.Parse(_y) + int.Parse(_z)) % 1000000000 != int.Parse(Text[0].text) && strike == 0)
-            { 
-                strike = 4;
-                Debug.LogFormat("[Palindromes #{0}]: Variable X, Y, and Z does not add up to the screen display!", _moduleId, _x, _y, _z, Text[0].text);
-            }
+            //if x + y + z is are not equal to the screen display, the module should strike, if the nonexistent button is pushed, it's asking for an auto-solve
+            bool strike = false;
+            if ((int.Parse(x) + int.Parse(y) + int.Parse(z)) % 1000000000 != int.Parse(Text[0].text) && btn < 3)
+                strike = true;
 
             //if anyone of the above parameters are true, strike the module here
             StartCoroutine(Answer(strike));
         }
     }
 
-    private IEnumerator Answer(byte strike)
+    private IEnumerator Answer(bool strike)
     {
+        n = Text[0].text;
         _isAnimating = true;
 
-        yield return null;
-
-        int temp = int.Parse(Text[0].text), total = (int.Parse(_x) + int.Parse(_y) + int.Parse(_z) % 1000000000), n = 0;
-        while (n < 10000)
+        int temp = int.Parse(Text[0].text), total = (int.Parse(x) + int.Parse(y) + int.Parse(z) % 1000000000), inc = 0;
+        while (inc < 10000)
         {
-            n += 125;
-            float f = n;
+            inc += 125;
+            float f = inc;
             f /= 10000;
             Text[0].text = Mathf.Clamp(temp - total * BackOut(f), -999999999, 999999999).ToString("#########") + "";
             yield return new WaitForSeconds(0.021f);
         }
 
         //strike
-        if (strike != 0)
+        if (strike)
         {
             Audio.PlaySoundAtTransform("answer", Buttons[1].transform);
-            Debug.LogFormat("[Palindromes #{0}]: Strike! The numbers didn't meet the required parameters.", _moduleId);
+            Debug.LogFormat("[Palindromes #{0}]: Strike! Variable X, Y, and Z does not add up to the screen display!", _moduleId);
             Module.HandleStrike();
 
-            Text[1].text = " ";
-            string[] text = { "ERROR-1:\nXis not\npalindromic!", "ERROR-2:\nY is not\npalindromic!", "ERROR-3:\nZ is not\npalindromic!", "ERROR-4:\nX+Y+Z does\nnot equal N!" };
-            for (byte i = 0; i < text[strike - 1].Length; i++)
+            Text[1].text = "";
+            string error = "ERROR:\nX+Y+Z does\nnot equal N!";
+            
+            for (byte i = 0; i < error.Length; i++)
             {
-                Text[1].text += text[strike - 1][i];
+                Text[1].text += error[i];
                 yield return new WaitForSeconds(0.021f);
             }
 
             float f = 0;
             while (f < 1)
             {
-                Text[0].color = new Color32((byte)(Text[0].color.r * 255), (byte)(Text[0].color.g * 255), (byte)(Text[0].color.b * 255), (byte)((1 - ExponentialIn(f)) * 255));
-                Text[1].color = new Color32((byte)(Text[0].color.r * 255), (byte)(Text[0].color.g * 255), (byte)(Text[0].color.b * 255), (byte)((1 - ExponentialIn(f)) * 255));
+                Text[0].color = new Color32((byte)(Text[0].color.r * 255), (byte)(Text[0].color.g * 255), (byte)(Text[0].color.b * 255), (byte)((1 - CubicOut(f)) * 255));
+                Text[1].color = new Color32((byte)(Text[0].color.r * 255), (byte)(Text[0].color.g * 255), (byte)(Text[0].color.b * 255), (byte)((1 - CubicOut(f)) * 255));
                 f += 0.0125f;
                 yield return new WaitForSeconds(0.021f);
             }
 
-            _x = "";
-            _y = "";
-            _z = "";
+            x = "";
+            y = "";
+            z = "";
 
             Text[1].text = "X  =  " + _current;
             Text[1].text += "\nY  =  ";
@@ -268,8 +253,8 @@ public class palindromes : MonoBehaviour
             f = 0;
             while (f < 1)
             {
-                Text[0].color = new Color32((byte)(Text[0].color.r * 255), (byte)(Text[0].color.g * 255), (byte)(Text[0].color.b * 255), (byte)(ExponentialIn(f) * 255));
-                Text[1].color = new Color32((byte)(Text[0].color.r * 255), (byte)(Text[0].color.g * 255), (byte)(Text[0].color.b * 255), (byte)(ExponentialIn(f) * 255));
+                Text[0].color = new Color32((byte)(Text[0].color.r * 255), (byte)(Text[0].color.g * 255), (byte)(Text[0].color.b * 255), (byte)(CubicOut(f) * 255));
+                Text[1].color = new Color32((byte)(Text[0].color.r * 255), (byte)(Text[0].color.g * 255), (byte)(Text[0].color.b * 255), (byte)(CubicOut(f) * 255));
                 f += 0.0125f;
                 yield return new WaitForSeconds(0.011f);
             }
@@ -281,16 +266,16 @@ public class palindromes : MonoBehaviour
             Text[0].text = "";
             Text[1].text = "YOU  FOUND  IT!";
             Debug.LogFormat("[Palindromes #{0}]: All numbers are palindromic and add up to the screen number, module solved!", _moduleId);
-            _isSolved = true;
+            isSolved = true;
             Module.HandlePass();
         }
 
         _isAnimating = false;
     }
 
-    private static float ExponentialIn(float k)
+    private static float CubicOut(float k)
     {
-        return k == 0f ? 0f : Mathf.Pow(1024f, k - 1f);
+        return 1f + ((k -= 1f) * k * k);
     }
 
     private static float BackOut(float k)
@@ -343,7 +328,7 @@ public class palindromes : MonoBehaviour
             else
             {
                 //deletes everything in case if anything was inputted
-                while (_x.Length != 0)
+                while (x.Length != 0)
                 {
                     Buttons[2].OnInteract();
                     yield return new WaitForSeconds(0.15f);
@@ -375,9 +360,7 @@ public class palindromes : MonoBehaviour
     {
         //autosolve
         yield return null;
-        _isSolved = true;
         Debug.LogFormat("[Palindromes #{0}]: Admin has initiated a forced solve... Since generating an answer would take hundreds of algorithms and 40 pages of mathematical manuals to learn, I have decided to just solve instantly!", _moduleId);
-        Module.HandlePass();
-        Audio.PlaySoundAtTransform("solve", Buttons[1].transform);
+        HandlePress(3);
     }
 }
