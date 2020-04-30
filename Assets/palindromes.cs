@@ -15,7 +15,7 @@ public class Palindromes : MonoBehaviour
     bool isSolved = false;
     private bool _isAnimating = false;
     private byte _current = 0;
-    static int _moduleIdCounter;
+    static int _moduleIdCounter = 1;
     int _moduleId;
 #pragma warning disable 414
     string x = "", y = "", z = "", n = "";
