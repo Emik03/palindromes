@@ -33,7 +33,7 @@ public class Palindromes : MonoBehaviour
                 attempts++;
                 palindrome = true;
                 //generates a 9-digit number for the screen display
-                Text[0].text = Random.Range(1, 1000000000).ToString();
+                Text[0].text = Random.Range(10000000, 1000000000).ToString();
                 Debug.LogFormat("[Palindromes #{0}]: Generated number \"{1}\"", _moduleId, Text[0].text);
 
                 //anti-palindrome check
@@ -43,10 +43,7 @@ public class Palindromes : MonoBehaviour
                         palindrome = false;
                         break;
                     }
-
-                if (Application.isEditor)
-                    palindrome = palindrome && Text[0].text.Length == 9;
-            } while (palindrome ^ Application.isEditor);
+            } while (palindrome);
         //palindrome generator for debug so that it doesn't take me 2 years to solve the darn thing
         else
         {
@@ -62,7 +59,7 @@ public class Palindromes : MonoBehaviour
         while (Text[0].text.Length < 9)
             Text[0].text = Text[0].text.Insert(0, "0");
 
-        Debug.LogFormat("[Palindromes #{0}]: Recieved screen \"{1}\", taking {2} attempt(s).", _moduleId, Text[0].text, attempts);
+        Debug.LogFormat("[Palindromes #{0}]: Received screen \"{1}\", taking {2} attempt(s).", _moduleId, Text[0].text, attempts);
 
         //puts in correct index when you push one of the three buttons
         for (byte i = 0; i < Buttons.Length; i++)
@@ -192,7 +189,7 @@ public class Palindromes : MonoBehaviour
 
             //if x + y + z is are not equal to the screen display, the module should strike, if the nonexistent button is pushed, it's asking for an auto-solve
             bool strike = false;
-            if ((int.Parse(x) + int.Parse(y) + int.Parse(z)) % 1000000000 != int.Parse(Text[0].text) && btn < 3)
+            if (int.Parse(x) + int.Parse(y) + int.Parse(z) != int.Parse(Text[0].text) && btn < 3)
                 strike = true;
 
             //if anyone of the above parameters are true, strike the module here
@@ -205,7 +202,7 @@ public class Palindromes : MonoBehaviour
         n = Text[0].text;
         _isAnimating = true;
 
-        int temp = int.Parse(Text[0].text), total = (int.Parse(x) + int.Parse(y) + int.Parse(z) % 1000000000), inc = 0;
+        int temp = int.Parse(Text[0].text), total = int.Parse(x) + int.Parse(y) + int.Parse(z), inc = 0;
         while (inc < 10000)
         {
             inc += 125;
@@ -302,27 +299,27 @@ public class Palindromes : MonoBehaviour
 
     IEnumerator ProcessTwitchCommand(string command)
     {
-        string[] buttonPressed = command.Split(' ');
+        string[] par = command.Split(' ');
 
         //if command is formatted correctly
-        if (Regex.IsMatch(buttonPressed[0], @"^\s*submit\s*$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant))
+        if (Regex.IsMatch(par[0], @"^\s*submit\s*$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant))
         {
             yield return null;
 
             //if three numbers haven't been submitted
-            if (buttonPressed.Length < 4)
+            if (par.Length < 4)
                 yield return "sendtochaterror Please specify the three numbers you wish to submit.";
 
             //if more than three numbers have been submitted
-            else if (buttonPressed.Length > 4)
+            else if (par.Length > 4)
                 yield return "sendtochaterror Too many numbers submitted! Please submit exactly 3 numbers.";
 
             //if any input aren't numbers, or aren't palindromes
-            else if (!IsValid(buttonPressed[1]) || !IsValid(buttonPressed[2]) || !IsValid(buttonPressed[3]))
+            else if (!IsValid(par[1]) || !IsValid(par[2]) || !IsValid(par[3]))
                 yield return "sendtochaterror The numbers have to be palindromes! (Written the same forwards as backwards.)";
 
             //if any numbers aren't the correct digit length
-            else if (buttonPressed[1].Length != 9 || buttonPressed[2].Length != 8 || buttonPressed[3].Length != 7)
+            else if (par[1].Length != 9 || par[2].Length != 8 || par[3].Length != 7)
                 yield return "sendtochaterror The numbers have to be 9 digits, 8 digits, then 7 digits, in that order.";
 
             else
@@ -334,6 +331,7 @@ public class Palindromes : MonoBehaviour
                     yield return new WaitForSeconds(0.15f);
                 }
 
+                //execute the instructions provided for each character in each string
                 for (byte i = 1; i <= 3; i++)
                     for (byte j = 0; j < 5; j++)
                     {
@@ -342,7 +340,7 @@ public class Palindromes : MonoBehaviour
                             continue;
 
                         //if the current button isn't equal to what the user submitted, press the left button to cycle through the numbers until it's false
-                        while (_current.ToString().ToCharArray()[0] != buttonPressed[i][j])
+                        while (_current.ToString().ToCharArray()[0] != par[i][j])
                         {
                             Buttons[0].OnInteract();
                             yield return new WaitForSeconds(0.05f);
@@ -352,6 +350,12 @@ public class Palindromes : MonoBehaviour
                         Buttons[1].OnInteract();
                         yield return new WaitForSeconds(0.15f);
                     }
+                //since the module has a solve animation, i'm required to submit early whether the module solves or not
+                if (int.Parse(par[1]) + int.Parse(par[2]) + int.Parse(par[3]) != int.Parse(n))
+                    yield return "strike";
+
+                else
+                    yield return "solve";
             }
         }
     }
@@ -360,7 +364,61 @@ public class Palindromes : MonoBehaviour
     {
         //autosolve
         yield return null;
-        Debug.LogFormat("[Palindromes #{0}]: Admin has initiated a forced solve... Since generating an answer would take hundreds of algorithms and 40 pages of mathematical manuals to learn, I have decided to just solve instantly!", _moduleId);
-        HandlePress(3);
+        Debug.LogFormat("[Palindromes #{0}]: Admin has initiated AutoSolver, running mythers' algorithm.", _moduleId);
+
+        //get the solver
+        System.Collections.Generic.List<string> l = new System.Collections.Generic.List<string>();
+        l = Solver.Get(Text[0].text);
+
+        //in case if it somehow returned 4 elements
+        if (l.Count != 4)
+        {
+            Debug.LogFormat("[Palindromes #{0}]: Algorithm failed to return a list of size 4. Here's what the algorithm gave: {1}", _moduleId, l.Join(", "));
+            HandlePress(3);
+            yield break;
+        }
+
+        int[] ans = new int[4];
+
+        //in case if any of them have periods (unfilled numbers)
+        for (int i = 0; i < ans.Length; i++)
+        {
+            if (!int.TryParse(l[i], out ans[i]))
+            {
+                Debug.LogFormat("[Palindromes #{0}]: Algorithm failed to parse one of the 4 elements in the list. Here's what the algorithm gave: {1}", _moduleId, l.Join(", "));
+                HandlePress(3);
+                yield break;
+            }
+        }
+
+        //in case if it doesn't actually add up to the screen
+        if (ans[1] + ans[2] + ans[3] != ans[0])
+        {
+            Debug.LogFormat("[Palindromes #{0}]: Algorithm returned numbers that didn't add up to the screen number. Here's what the algorithm gave: {1}", _moduleId, l.Join(", "));
+            HandlePress(3);
+            yield break;
+        }
+
+        Debug.LogFormat("[Palindromes #{0}]: One of the answers found for \"{1}\" is \"{2}\", \"{3}\", and \"{4}\".", _moduleId, l[0], l[1], l[2], l[3]);
+
+        //execute the instructions provided for each character in each string
+        for (byte i = 1; i <= 3; i++)
+            for (byte j = 0; j < 5; j++)
+            {
+                //the only 5-digit number that needs to be inputted is X
+                if (i != 1 && j == 4)
+                    continue;
+
+                //if the current button is equal to what the user submitted, press the left button to cycle through the numbers until it's false
+                while (_current.ToString().ToCharArray()[0] != l[i][j])
+                {
+                    Buttons[0].OnInteract();
+                    yield return new WaitForSeconds(0.05f);
+                }
+
+                //press the middle button which submits the digit
+                Buttons[1].OnInteract();
+                yield return new WaitForSeconds(0.15f);
+            }
     }
 }
