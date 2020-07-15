@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 
 /// <summary>
@@ -9,10 +10,10 @@ using UnityEngine;
 public class Solver : MonoBehaviour
 {
     /// <summary>
-    /// 
+    /// Runs through the algorithm to extract 3 palindromic numbers that add up to 'd'.
     /// </summary>
     /// <param name="d">The sum of three palindromes. The screen's displayed number.</param>
-    public static List<string> Get(string d)
+    public static List<string> Get(string d, int moduleId)
     {
         List<string> l = new List<string>();
         for (int i = 0; i < d.Length; i++)
@@ -29,6 +30,40 @@ public class Solver : MonoBehaviour
 
             Calculate(l, 0);
         }
+
+        return Validate(l, moduleId);
+    }
+
+    private static List<string> Validate(List<string> l, int moduleId)
+    {
+        //in case if it somehow returned 4 elements
+        if (l.Count != 4)
+        {
+            Debug.LogFormat("[Palindromes #{0}]: Algorithm > Failed to return a list of size 4: {1}", moduleId, l.Join(", "));
+            return new List<string>(0);
+        }
+
+        int[] ans = new int[4];
+
+        //in case if any of them have periods (unfilled numbers)
+        for (byte i = 0; i < ans.Length; i++)
+        {
+            if (!int.TryParse(l[i], out ans[i]))
+            {
+                Debug.LogFormat("[Palindromes #{0}]: Algorithm > Failed to parse an element in the list: {1}", moduleId, l.Join(", "));
+                return new List<string>(0);
+            }
+        }
+
+        //in case if it doesn't actually add up to the screen
+        if (ans[1] + ans[2] + ans[3] != ans[0])
+        {
+            Debug.LogFormat("[Palindromes #{0}]: Algorithm > Gave incorrect numbers: {1}", moduleId, l.Join(", "));
+            return new List<string>(0);
+        }
+
+        if (l.Count != 0)
+            Debug.LogFormat("[Palindromes #{0}]: Example solution > {1}.", moduleId, l.Skip(1).Join(" & "));
 
         return l;
     }
@@ -142,24 +177,21 @@ public class Solver : MonoBehaviour
 
     private static double Modulo(double num, int mod)
     {
-        while (true)
+        //modulation for negatives
+        if (num < 0)
         {
-            //modulation for negatives
-            if (num < 0)
-            {
-                num += mod;
-                continue;
-            }
-
-            //modulation for positives
-            else if (num >= mod)
-            {
-                num -= mod;
-                continue;
-            }
-
-            //once it reaches here, we know it's modulated and we can return it
-            return num;
+            num += mod;
+            num = Modulo(num, mod);
         }
+
+        //modulation for positives
+        else if (num >= mod)
+        {
+            num -= mod;
+            num = Modulo(num, mod);
+        }
+
+        //once it reaches here, we know it's modulated and can return it
+        return num;
     }
 }

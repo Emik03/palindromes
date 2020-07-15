@@ -140,4 +140,10 @@ public static class Easing
         time -= 2;
         return (end - start) / 2 * (Mathf.Sqrt(1 - time * time) + 1) + start;
     }
+
+    public static float OutBack(float k)
+    {
+        float s = 1.70158f;
+        return (k -= 1f) * k * ((s + 1f) * k + s) + 1f;
+    }
 }

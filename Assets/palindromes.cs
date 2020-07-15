@@ -1,7 +1,8 @@
 ﻿using UnityEngine;
-using System.Linq;
 using System.Collections;
+using System.Collections.Generic;
 using System.Text.RegularExpressions;
+using System.Linq;
 
 public class Palindromes : MonoBehaviour
 {
@@ -13,53 +14,16 @@ public class Palindromes : MonoBehaviour
     public TextMesh[] Text;
 
     bool isSolved = false;
-    private bool _isAnimating = false;
-    private byte _current = 0;
-    static int _moduleIdCounter = 1;
-    int _moduleId;
-#pragma warning disable 414
     string x = "", y = "", z = "", n = "";
-#pragma warning restore 414
-    
+
+    private bool _isAnimating;
+    private static int _moduleIdCounter = 1;
+    private int _moduleId;
+    private List<string> _exampleSolution;
+
     private void Awake()
     {
         _moduleId = _moduleIdCounter++;
-        bool palindrome = true;
-        ushort attempts = 0;
-        //makes sure that it doesn't generate a palindrome to prevent very rare unicorns
-        if (!Application.isEditor)
-            do
-            {
-                attempts++;
-                palindrome = true;
-                //generates a 9-digit number for the screen display
-                Text[0].text = Random.Range(10000000, 1000000000).ToString();
-                Debug.LogFormat("[Palindromes #{0}]: Generated number \"{1}\"", _moduleId, Text[0].text);
-
-                //anti-palindrome check
-                for (byte i = 0; i < Text[0].text.Length; i++)
-                    if (Text[0].text[i] != Text[0].text[Text[0].text.Length - i - 1])
-                    {
-                        palindrome = false;
-                        break;
-                    }
-            } while (palindrome);
-        //palindrome generator for debug so that it doesn't take me 2 years to solve the darn thing
-        else
-        {
-            attempts++;
-            Text[0].text = Random.Range(10000, 100000).ToString();
-            for (sbyte i = 3; i >= 0; i--)
-                Text[0].text += Text[0].text[i];
-        }
-
-        //debugging individual numbers
-        //Text[0].text = "123456789";
-
-        while (Text[0].text.Length < 9)
-            Text[0].text = Text[0].text.Insert(0, "0");
-
-        Debug.LogFormat("[Palindromes #{0}]: Received screen \"{1}\", taking {2} attempt(s).", _moduleId, Text[0].text, attempts);
 
         //puts in correct index when you push one of the three buttons
         for (byte i = 0; i < Buttons.Length; i++)
@@ -72,213 +36,191 @@ public class Palindromes : MonoBehaviour
                 return false;
             };
         }
+
+        //makes sure that it doesn't generate a palindrome to prevent very rare unicorns
+        while (true)
+        {
+            //generates a 9-digit number for the screen display
+            Text[0].text = Random.Range(10000000, 1000000000).ToString();
+
+            //anti-palindrome check
+            for (byte i = 0; i < Text[0].text.Length; i++)
+                if (Text[0].text[i] != Text[0].text[Text[0].text.Length - i - 1])
+                    goto generated;
+        }
+
+        //go here when the module has generated a valid number
+        generated:
+        while (Text[0].text.Length < 9)
+            Text[0].text = Text[0].text.Insert(0, "0");
+
+        //logging
+        Debug.LogFormat("[Palindromes #{0}]: Screen > {1}.", _moduleId, Text[0].text);
+        _exampleSolution = Solver.Get(Text[0].text, _moduleId);
     }
 
     private void HandlePress(byte btn)
     {
-        if (btn < 3)
-        {
-            Audio.PlayGameSoundAtTransform(KMSoundOverride.SoundEffect.ButtonPress, Buttons[btn].transform);
-            Buttons[btn].AddInteractionPunch();
-        }
+        Audio.PlayGameSoundAtTransform(KMSoundOverride.SoundEffect.ButtonPress, Buttons[btn].transform);
+        Buttons[btn].AddInteractionPunch();
 
         //if solved, do nothing
         if (isSolved || _isAnimating)
             return;
 
-        //if left button was pressed, cycle from 0 through 9
-        if (btn == 0)
+        string[] vs = new string[3] { x, y, z };
+
+        switch (btn)
         {
-            Audio.PlaySoundAtTransform("cycle", Buttons[btn].transform);
-            _current = (byte)(++_current % 10);
+            //cycle number
+            case 0:
+                Audio.PlaySoundAtTransform("cycle", Buttons[btn].transform);
+                Text[2].text = ((byte.Parse(Text[2].text) + 1) % 10).ToString();
+                break;
+
+            //submit number
+            case 1:
+                Audio.PlaySoundAtTransform("submit", Buttons[btn].transform);
+                for (byte i = 0; i < vs.Length; i++)
+                {
+                    //if current variable hasn't been filled yet
+                    if (vs[i].Length < 9 - i)
+                    {
+                        vs[i] += Text[2].text;
+                        Text[2].text = "0";
+                        //if left half has been inputted, generate palindrome
+                        if (vs[i].Length == 5 - System.Convert.ToByte(i != 0))
+                        {
+                            for (sbyte j = (sbyte)(3 - System.Convert.ToByte(i == 2)); j >= 0; j--)
+                                vs[i] += vs[i][j];
+
+                            goto render;
+                        }
+                        break;
+                    }
+                }
+                break;
+
+            //delete number
+            case 2:
+                Audio.PlaySoundAtTransform("delete", Buttons[btn].transform);
+                for (sbyte i = (sbyte)(vs.Length - 1); i >= 0; i--)
+                {
+                    if (vs[i].Length != 0)
+                    {
+                        vs[i] = "";
+                        break;
+                    }
+                }
+                Text[2].text = "0";
+                break;
+
+            //panic (twitch plays exclusive)
+            default: x = "000000000"; y = "00000000"; z = "0000000"; break;
         }
 
-        //if middle button was pressed, add it to the list
-        else if (btn == 1)
+        render:
+        bool isSubmitting = true;
+        for (byte i = 0; i < vs.Length; i++)
         {
-            Audio.PlaySoundAtTransform("submit", Buttons[btn].transform);
-
-            //if x hasn't been filled yet
-            if (x.Length < 9)
+            switch (i)
             {
-                x += _current;
-                //if left half has been inputted, generate palindrome
-                if (x.Length == 5)
-                    for (sbyte i = 3; i >= 0; i--)
-                        x += x[i];
+                case 0: Text[1].text = "X"; break;
+                case 1: Text[1].text += "\nY"; break;
+                case 2: Text[1].text += "\nZ"; break;
             }
 
-            //if y hasn't been filled yet
-            else if (y.Length < 8)
+            Text[1].text += "  =  " + vs[i];
+            
+            if (isSubmitting && vs[i].Length < 9 - i)
             {
-                y += _current;
-                //if left half has been inputted, generate palindrome
-                if (y.Length == 4)
-                    for (sbyte i = 3; i >= 0; i--)
-                        y += y[i];
+                Text[1].text += Text[2].text;
+                isSubmitting = false;
             }
-
-            //if z hasn't been filled yet
-            else if (z.Length < 7)
-            {
-                z += _current;
-                //if left half has been inputted, generate palindrome
-                if (z.Length == 4)
-                    for (sbyte i = 2; i >= 0; i--)
-                        z += z[i];
-            }
-            _current = 0;
         }
 
-        //if right button was pressed, delete the current variable
-        else if (btn == 2)
-        {
-            Audio.PlaySoundAtTransform("delete", Buttons[btn].transform);
-            if (z.Length != 0)
-                z = "";
-            else if (y.Length != 0)
-                y = "";
-            else if (x.Length != 0)
-                x = "";
-            _current = 0;
-        }
-
-        //a fourth button normally doesn't exist on this module, but this is meant for twitchplays to auto-solve with
-        else
-        {
-            x = "000000000";
-            y = "00000000";
-            z = "0000000";
-        }
-
-        //update text on the button
-        Text[2].text = _current.ToString();
-
-        //if x is unfinished, display current digit on x
-        if (x.Length < 9)
-        {
-            Text[1].text = "X  =  " + x + _current;
-            Text[1].text += "\nY  =  " + y;
-            Text[1].text += "\nZ  =  " + z;
-        }
-
-        //if y is unfinished, display current digit on y
-        else if (y.Length < 8)
-        {
-            Text[1].text = "X  =  " + x;
-            Text[1].text += "\nY  =  " + y + _current;
-            Text[1].text += "\nZ  =  " + z;
-        }
-
-        //if z is unfinished, display current digit on z
-        else if (z.Length < 7)
-        {
-            Text[1].text = "X  =  " + x;
-            Text[1].text += "\nY  =  " + y;
-            Text[1].text += "\nZ  =  " + z + _current;
-        }
+        x = vs[0];
+        y = vs[1];
+        z = vs[2];
 
         //if everything has been filled, check if the answer is correct
-        else
-        {
-            Audio.PlaySoundAtTransform("calculate", Buttons[1].transform);
-            Debug.LogFormat("[Palindromes #{0}]: Submitting numbers \"{1}\", \"{2}\", and \"{3}\".", _moduleId, x, y, z);
-            Text[1].text = "X  =  " + x;
-            Text[1].text += "\nY  =  " + y;
-            Text[1].text += "\nZ  =  " + z;
-
-            //if x + y + z is are not equal to the screen display, the module should strike, if the nonexistent button is pushed, it's asking for an auto-solve
-            bool strike = false;
-            if (int.Parse(x) + int.Parse(y) + int.Parse(z) != int.Parse(Text[0].text) && btn < 3)
-                strike = true;
-
-            //if anyone of the above parameters are true, strike the module here
-            StartCoroutine(Answer(strike));
-        }
+        if (isSubmitting)
+            StartCoroutine(CheckAnswer(int.Parse(x) + int.Parse(y) + int.Parse(z) != int.Parse(Text[0].text) && btn < 3));
     }
 
-    private IEnumerator Answer(bool strike)
+    private IEnumerator CheckAnswer(bool strike)
     {
-        n = Text[0].text;
         _isAnimating = true;
 
+        Audio.PlaySoundAtTransform("calculate", Buttons[1].transform);
+        Debug.LogFormat("[Palindromes #{0}]: Submitting > {1}.", _moduleId, new string[3] { x, y, z }.Join(" & "));
+
+        n = Text[0].text;
         int temp = int.Parse(Text[0].text), total = int.Parse(x) + int.Parse(y) + int.Parse(z), inc = 0;
+
         while (inc < 10000)
         {
             inc += 125;
             float f = inc;
             f /= 10000;
-            Text[0].text = Mathf.Clamp(temp - total * BackOut(f), -999999999, 999999999).ToString("#########") + "";
-            yield return new WaitForSeconds(0.021f);
+            Text[0].text = Mathf.Clamp(temp - total * Easing.OutBack(f), -999999999, 999999999).ToString("#########") + "";
+            yield return new WaitForSeconds(0.02f);
         }
 
         //strike
         if (strike)
         {
             Audio.PlaySoundAtTransform("answer", Buttons[1].transform);
-            Debug.LogFormat("[Palindromes #{0}]: Strike! Variable X, Y, and Z does not add up to the screen display!", _moduleId);
+            Debug.LogFormat("[Palindromes #{0}]: Strike! > {1}", _moduleId, temp - total);
             Module.HandleStrike();
 
             Text[1].text = "";
             string error = "ERROR:\nX+Y+Z does\nnot equal N!";
-            
+
             for (byte i = 0; i < error.Length; i++)
             {
                 Text[1].text += error[i];
-                yield return new WaitForSeconds(0.021f);
+                yield return new WaitForSeconds(0.02f);
             }
 
             float f = 0;
             while (f < 1)
             {
-                Text[0].color = new Color32((byte)(Text[0].color.r * 255), (byte)(Text[0].color.g * 255), (byte)(Text[0].color.b * 255), (byte)((1 - CubicOut(f)) * 255));
-                Text[1].color = new Color32((byte)(Text[0].color.r * 255), (byte)(Text[0].color.g * 255), (byte)(Text[0].color.b * 255), (byte)((1 - CubicOut(f)) * 255));
+                for (int i = 0; i < Text.Length; i++)
+                    Text[i].color = new Color32((byte)(Text[i].color.r * 255), (byte)(Text[i].color.g * 255), (byte)(Text[i].color.b * 255), (byte)((1 - Easing.OutCubic(f, 0, 1, 1)) * 255));
+                yield return new WaitForSeconds(0.02f);
                 f += 0.0125f;
-                yield return new WaitForSeconds(0.021f);
             }
 
             x = "";
             y = "";
             z = "";
 
-            Text[1].text = "X  =  " + _current;
-            Text[1].text += "\nY  =  ";
-            Text[1].text += "\nZ  =  ";
-
             Text[0].text = temp.ToString("#########");
+            Text[1].text = "X  =  " + Text[2].text + "\nY  =  \nZ  =  ";
 
             f = 0;
             while (f < 1)
             {
-                Text[0].color = new Color32((byte)(Text[0].color.r * 255), (byte)(Text[0].color.g * 255), (byte)(Text[0].color.b * 255), (byte)(CubicOut(f) * 255));
-                Text[1].color = new Color32((byte)(Text[0].color.r * 255), (byte)(Text[0].color.g * 255), (byte)(Text[0].color.b * 255), (byte)(CubicOut(f) * 255));
+                for (int i = 0; i < Text.Length; i++)
+                    Text[i].color = new Color32((byte)(Text[i].color.r * 255), (byte)(Text[i].color.g * 255), (byte)(Text[i].color.b * 255), (byte)(Easing.OutCubic(f, 0, 1, 1) * 255));
+                yield return new WaitForSeconds(0.01f);
                 f += 0.0125f;
-                yield return new WaitForSeconds(0.011f);
             }
         }
+
         //solve
         else
         {
             Audio.PlaySoundAtTransform("answer", Buttons[1].transform);
-            Text[0].text = "";
+            Text[0].text = "0";
             Text[1].text = "YOU  FOUND  IT!";
-            Debug.LogFormat("[Palindromes #{0}]: All numbers are palindromic and add up to the screen number, module solved!", _moduleId);
+            Debug.LogFormat("[Palindromes #{0}]: Solved! > 0", _moduleId);
             isSolved = true;
             Module.HandlePass();
         }
 
         _isAnimating = false;
-    }
-
-    private static float CubicOut(float k)
-    {
-        return 1f + ((k -= 1f) * k * k);
-    }
-
-    private static float BackOut(float k)
-    {
-        float s = 1.70158f;
-        return (k -= 1f) * k * ((s + 1f) * k + s) + 1f;
     }
 
     private bool IsValid(string par)
@@ -314,13 +256,13 @@ public class Palindromes : MonoBehaviour
             else if (par.Length > 4)
                 yield return "sendtochaterror Too many numbers submitted! Please submit exactly 3 numbers.";
 
-            //if any input aren't numbers, or aren't palindromes
-            else if (!IsValid(par[1]) || !IsValid(par[2]) || !IsValid(par[3]))
-                yield return "sendtochaterror The numbers have to be palindromes! (Written the same forwards as backwards.)";
-
             //if any numbers aren't the correct digit length
             else if (par[1].Length != 9 || par[2].Length != 8 || par[3].Length != 7)
                 yield return "sendtochaterror The numbers have to be 9 digits, 8 digits, then 7 digits, in that order.";
+
+            //if any input aren't numbers, or aren't palindromes
+            else if (!IsValid(par[1]) || !IsValid(par[2]) || !IsValid(par[3]))
+                yield return "sendtochaterror The numbers have to be palindromes! (Written the same forwards as backwards.)";
 
             else
             {
@@ -340,7 +282,7 @@ public class Palindromes : MonoBehaviour
                             continue;
 
                         //if the current button isn't equal to what the user submitted, press the left button to cycle through the numbers until it's false
-                        while (_current.ToString().ToCharArray()[0] != par[i][j])
+                        while (Text[2].text[0] != par[i][j])
                         {
                             Buttons[0].OnInteract();
                             yield return new WaitForSeconds(0.05f);
@@ -364,61 +306,34 @@ public class Palindromes : MonoBehaviour
     {
         //autosolve
         yield return null;
-        Debug.LogFormat("[Palindromes #{0}]: Admin has initiated AutoSolver, running mythers' algorithm.", _moduleId);
+        Debug.LogFormat("[Palindromes #{0}]: AutoSolver > Initiating.", _moduleId);
 
-        //get the solver
-        System.Collections.Generic.List<string> l = new System.Collections.Generic.List<string>();
-        l = Solver.Get(Text[0].text);
-
-        //in case if it somehow returned 4 elements
-        if (l.Count != 4)
-        {
-            Debug.LogFormat("[Palindromes #{0}]: Algorithm failed to return a list of size 4. Here's what the algorithm gave: {1}", _moduleId, l.Join(", "));
+        //if the algorithm failed, solve instantly
+        if (_exampleSolution.Count == 0)
             HandlePress(3);
-            yield break;
-        }
 
-        int[] ans = new int[4];
-
-        //in case if any of them have periods (unfilled numbers)
-        for (int i = 0; i < ans.Length; i++)
+        //if the algorithm succeeds, proceed to submit the numbers generated
+        else
         {
-            if (!int.TryParse(l[i], out ans[i]))
-            {
-                Debug.LogFormat("[Palindromes #{0}]: Algorithm failed to parse one of the 4 elements in the list. Here's what the algorithm gave: {1}", _moduleId, l.Join(", "));
-                HandlePress(3);
-                yield break;
-            }
-        }
-
-        //in case if it doesn't actually add up to the screen
-        if (ans[1] + ans[2] + ans[3] != ans[0])
-        {
-            Debug.LogFormat("[Palindromes #{0}]: Algorithm returned numbers that didn't add up to the screen number. Here's what the algorithm gave: {1}", _moduleId, l.Join(", "));
-            HandlePress(3);
-            yield break;
-        }
-
-        Debug.LogFormat("[Palindromes #{0}]: One of the answers found for \"{1}\" is \"{2}\", \"{3}\", and \"{4}\".", _moduleId, l[0], l[1], l[2], l[3]);
-
-        //execute the instructions provided for each character in each string
-        for (byte i = 1; i <= 3; i++)
-            for (byte j = 0; j < 5; j++)
-            {
-                //the only 5-digit number that needs to be inputted is X
-                if (i != 1 && j == 4)
-                    continue;
-
-                //if the current button is equal to what the user submitted, press the left button to cycle through the numbers until it's false
-                while (_current.ToString().ToCharArray()[0] != l[i][j])
+            //execute the instructions provided for each character in each string
+            for (byte i = 1; i <= 3; i++)
+                for (byte j = 0; j < 5; j++)
                 {
-                    Buttons[0].OnInteract();
-                    yield return new WaitForSeconds(0.05f);
-                }
+                    //the only 5-digit number that needs to be inputted is X
+                    if (i != 1 && j == 4)
+                        continue;
 
-                //press the middle button which submits the digit
-                Buttons[1].OnInteract();
-                yield return new WaitForSeconds(0.15f);
-            }
+                    //if the current button is equal to what the user submitted, press the left button to cycle through the numbers until it's false
+                    while (Text[2].text[0] != _exampleSolution[i][j])
+                    {
+                        Buttons[0].OnInteract();
+                        yield return new WaitForSeconds(0.05f);
+                    }
+
+                    //press the middle button which submits the digit
+                    Buttons[1].OnInteract();
+                    yield return new WaitForSeconds(0.15f);
+                }
+        }
     }
 }
