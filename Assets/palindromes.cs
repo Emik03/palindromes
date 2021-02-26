@@ -334,6 +334,9 @@ public class Palindromes : MonoBehaviour
                     Buttons[1].OnInteract();
                     yield return new WaitForSeconds(0.15f);
                 }
+
+            while (!isSolved)
+                yield return true;
         }
     }
 }
